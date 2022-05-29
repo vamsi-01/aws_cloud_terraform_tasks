@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: Service
+metadata: 
+  name: drupal-service
+  labels:
+    app: drupal
+spec: 
+  ports: 
+    - port: 80    
+  selector: 
+    app: drupal
+    tier: frontend
+  type: LoadBalancer
+--- 
+apiVersion: apps/v1
+kind: Deployment
+metadata: 
+  labels: 
+    app: drupal
+  name: drupal
+spec:
+  selector:
+    matchLabels:
+      app: drupal
+      tier: frontend
+  strategy:
+    type: Recreate 
+  template: 
+    metadata: 
+      labels: 
+        app: drupal
+        tier: frontend
+    spec: 
+      initContainers:
+        - name: init-sites-volume
+          image: drupal:8.6
+          command: ['/bin/bash', '-c']
+          args: ['cp -r /var/www/html/sites/ /data/; chown www-data:www-data /data/ -R']
+          volumeMounts:
+          - mountPath: /data
+            name: vol-drupal
+      containers: 
+        - image: drupal:8.6
+          name: drupal
+          ports: 
+            - containerPort: 80
+          volumeMounts:
+          - mountPath: /var/www/html/modules
+            name: vol-drupal
+            subPath: modules
+          - mountPath: /var/www/html/profiles
+            name: vol-drupal
+            subPath: profiles
+          - mountPath: /var/www/html/sites
+            name: vol-drupal
+            subPath: sites
+          - mountPath: /var/www/html/themes
+            name: vol-drupal
+            subPath: themes
+      volumes:
+        - name: vol-drupal
+          persistentVolumeClaim: 
+            claimName: efs-drupal
